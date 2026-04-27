@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Celestial Mahjong</title>
+<title>Celestial Mahjong – Meta Quest 3</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <style>
@@ -123,9 +123,9 @@ function createStars(){
 // ─── HUD ────────────────────────────────────────────────────────────────────
 function buildHUD(){
   hud = new THREE.Group(); hud.position.set(0, 2.25, -1.8); scene.add(hud);
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 160;
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 200;
   const tex = new THREE.CanvasTexture(c);
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.22),
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.273),
     new THREE.MeshBasicMaterial({ map:tex, transparent:true }));
   hud.add(mesh); hud.userData = { canvas:c, ctx:c.getContext('2d'), tex };
 }
@@ -135,16 +135,30 @@ function rRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+
   ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
   ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
 function updateHUD(){
-  const { canvas, ctx, tex } = hud.userData, W=1024, H=160;
+  const { canvas, ctx, tex } = hud.userData, W=1024, H=200;
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='rgba(8,8,28,0.85)'; rRect(ctx,0,0,W,H,28); ctx.fill();
-  ctx.strokeStyle='rgba(120,200,255,0.7)'; ctx.lineWidth=4; rRect(ctx,0,0,W,H,28); ctx.stroke();
+  // Frame
+  ctx.fillStyle='rgba(8,8,28,0.85)'; rRect(ctx,0,0,W,H,32); ctx.fill();
+  ctx.strokeStyle='rgba(120,200,255,0.7)'; ctx.lineWidth=4; rRect(ctx,0,0,W,H,32); ctx.stroke();
   if (clapStart > 0){
     const prog = Math.min(1, (Date.now()-clapStart)/CLAP_TIME);
-    ctx.fillStyle = `rgba(255,${Math.round(255*(1-prog))},60,0.9)`;
-    rRect(ctx,8,8,Math.round((W-16)*prog),H-16,22); ctx.fill();
-    ctx.fillStyle='#fff'; ctx.font='bold 48px Georgia'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(`👏 Hold ${Math.ceil((CLAP_TIME-(Date.now()-clapStart))/1000)}s to exit`, W/2, H/2);
+    const remain = Math.ceil((CLAP_TIME-(Date.now()-clapStart))/1000);
+    // 1. TEXT FIRST — full width, always 100% legible from frame 1
+    ctx.fillStyle='#ffffff'; ctx.font='bold 52px Georgia';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8; ctx.shadowOffsetY=2;
+    ctx.fillText(`👏 Hold sammen i ${remain}s for at lukke`, W/2, 70);
+    ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+    // 2. BAR TRACK — slim, separate, below the text
+    ctx.fillStyle='rgba(120,200,255,0.18)';
+    rRect(ctx, 32, 138, W-64, 36, 18); ctx.fill();
+    // 3. BAR FILL — NXT/Care sky-blue gradient, left-to-right
+    if (prog > 0){
+      const grad = ctx.createLinearGradient(32, 0, W-32, 0);
+      grad.addColorStop(0, '#bae6fd'); grad.addColorStop(1, '#0ea5e9');
+      ctx.fillStyle = grad;
+      rRect(ctx, 32, 138, Math.round((W-64)*prog), 36, 18); ctx.fill();
+    }
   } else {
     ctx.fillStyle='#ffdd88'; ctx.font='bold 64px Georgia'; ctx.textAlign='left'; ctx.textBaseline='middle';
     ctx.fillText(`⭐ ${state.score||0}`, 40, H/2);
@@ -153,7 +167,7 @@ function updateHUD(){
     ctx.fillText(`🀄 ${pairs} left`, W-40, H/2);
     if (state.gameOver && state.tiles && !state.tiles.length){
       ctx.fillStyle='#44ff88'; ctx.textAlign='center';
-      ctx.fillText('🎉 YOU WIN! Trigger to restart', W/2, H/2);
+      ctx.fillText('🎉 DU VANDT! Tryk for at spille igen', W/2, H/2);
     }
   }
   tex.needsUpdate = true;
