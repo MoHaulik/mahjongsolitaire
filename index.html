@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Celestial Mahjong – Meta Quest 3</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<style>
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#050510;font-family:Georgia,serif}
+#overlay{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2em;background:radial-gradient(ellipse at center,rgba(30,10,60,.92) 0%,rgba(5,5,16,.97) 100%);backdrop-filter:blur(18px)}
+#title{font-size:clamp(28px,7vw,72px);color:#88ddff;letter-spacing:.18em;text-transform:uppercase;text-shadow:0 0 40px rgba(100,180,255,.8),0 0 80px rgba(100,68,255,.4);margin:0;text-align:center}
+#start-btn{font-size:clamp(48px,11vw,110px);padding:.32em 1.1em;background:linear-gradient(135deg,#6644ff,#44aaff);color:#fff;border:none;border-radius:22px;cursor:pointer;font-weight:900;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 0 80px rgba(100,68,255,.65),inset 0 1px 0 rgba(255,255,255,.2);font-family:Georgia,serif;transition:filter .2s,transform .2s}
+#start-btn:hover{filter:brightness(1.25);transform:scale(1.05)}
+</style>
+</head>
+<body>
+<div id="overlay"><p id="title">Celestial Mahjong</p><button id="start-btn">START</button></div>
+<script type="module">
+import * as THREE from 'three';
+
+// ─── Clap to Close ─────────────────────────────────────────────────────────
+let clapStart = 0;
+const CLAP_DIST = 0.15, CLAP_TIME = 6000;
+function checkClap(ctrls, exitFn){
+  if (ctrls.length < 2){ clapStart = 0; return; }
+  const c1 = ctrls[0], c2 = ctrls[1];
+  if (c1.position.lengthSq() === 0 && c2.position.lengthSq() === 0){ clapStart = 0; return; }
+  if (c1.position.distanceTo(c2.position) <= CLAP_DIST){
+    if (!clapStart) clapStart = Date.now();
+    else if (Date.now() - clapStart >= CLAP_TIME){ exitFn(); clapStart = 0; }
+  } else clapStart = 0;
+}
+
+// ─── Tiles & Suits (Exactly 36 types for 144 tiles) ────────────────────────
+const TW = 0.13, TH = 0.17, TD = 0.038;
+const SUITS = [
+  { syms:['🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏'], body:0xc03030, tint:'#fff5f5', border:'#a02020' }, // Characters
+  { syms:['🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘'], body:0x1a8040, tint:'#f0fff2', border:'#0e6028' }, // Bamboos
+  { syms:['🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡'], body:0x1a50c0, tint:'#f0f4ff', border:'#0e3890' }, // Dots
+  { syms:['🀀','🀁','🀂','🀃','🀄','🀅','🀆'],            body:0xb07000, tint:'#fffaee', border:'#805000' }, // Honors
+  { syms:['🌸','❄️'],                                 body:0x8844aa, tint:'#faeeff', border:'#602080' }  // Flowers/Seasons
+];
+const ALL_TYPES = [];
+SUITS.forEach((s,si) => s.syms.forEach(sym => ALL_TYPES.push({ sym, si })));
+
+// ─── Classic 144-Tile Turtle Layout ────────────────────────────────────────
+// Uses half-coordinate steps (cx, cy). A tile occupies 2 units of width/height.
+const LAYOUT = [
+  // Layer 0
+  ...Array.from({length: 12}, (_, i) => [i*2 + 4, 0, 0]),
+  ...Array.from({length: 8},  (_, i) => [i*2 + 8, 2, 0]),
+  ...Array.from({length: 10}, (_, i) => [i*2 + 6, 4, 0]),
+  ...Array.from({length: 12}, (_, i) => [i*2 + 4, 6, 0]),
+  [2, 7, 0], [28, 7, 0], [30, 7, 0], // Left and Right outriders
+  ...Array.from({length: 12}, (_, i) => [i*2 + 4, 8, 0]),
+  ...Array.from({length: 10}, (_, i) => [i*2 + 6, 10, 0]),
+  ...Array.from({length: 8},  (_, i) => [i*2 + 8, 12, 0]),
+  ...Array.from({length: 12}, (_, i) => [i*2 + 4, 14, 0]),
+  // Layer 1
+  ...Array.from({length: 6}, (_, i) => [i*2 + 10, 2, 1]),
+  ...Array.from({length: 6}, (_, i) => [i*2 + 10, 4, 1]),
+  ...Array.from({length: 6}, (_, i) => [i*2 + 10, 6, 1]),
+  ...Array.from({length: 6}, (_, i) => [i*2 + 10, 8, 1]),
+  ...Array.from({length: 6}, (_, i) => [i*2 + 10, 10, 1]),
+  ...Array.from({length: 6}, (_, i) => [i*2 + 10, 12, 1]),
+  // Layer 2
+  ...Array.from({length: 4}, (_, i) => [i*2 + 12, 4, 2]),
+  ...Array.from({length: 4}, (_, i) => [i*2 + 12, 6, 2]),
+  ...Array.from({length: 4}, (_, i) => [i*2 + 12, 8, 2]),
+  ...Array.from({length: 4}, (_, i) => [i*2 + 12, 10, 2]),
+  // Layer 3
+  ...Array.from({length: 2}, (_, i) => [i*2 + 14, 6, 3]),
+  ...Array.from({length: 2}, (_, i) => [i*2 + 14, 8, 3]),
+  // Layer 4 (Top)
+  [15, 7, 4]
+];
+
+// ─── Globals ────────────────────────────────────────────────────────────────
+let scene, camera, renderer, raycaster, clock, xrSession;
+let controllers = [], activeCtrl, rayLine, reticle;
+let hoveredTile = null;
+let rift, stars, hud, audio;
+let state = {};
+
+init();
+
+function init(){
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 100);
+  raycaster = new THREE.Raycaster();
+  clock = new THREE.Clock();
+  
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(devicePixelRatio);
+  renderer.xr.enabled = true;
+  renderer.setClearColor(0x000000, 0);
+  document.body.appendChild(renderer.domElement);
+  
+  scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(1,4,2); scene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0x88aaff, 0.5); dl2.position.set(-2,1,-1); scene.add(dl2);
+  
+  createRift(); createStars(); buildHUD(); initAudio();
+  
+  document.getElementById('start-btn').addEventListener('click', startXR);
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+}
+
+// ─── Backdrop ──────────────────────────────────────────────────────────────
+function createRift(){
+  const mat = new THREE.ShaderMaterial({
+    transparent:true, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false,
+    uniforms:{ time:{value:0}, c1:{value:new THREE.Color(0x6644ff)}, c2:{value:new THREE.Color(0x44ccff)} },
+    vertexShader:`varying vec2 vUv; uniform float time;
+      void main(){ vUv=uv; vec3 p=position; float d=length(uv-.5);
+        p.z+=sin(d*12.-time*2.)*.06*(1.-d*1.8);
+        gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.); }`,
+    fragmentShader:`uniform float time; uniform vec3 c1,c2; varying vec2 vUv;
+      float n(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+      void main(){ vec2 cv=vUv-.5; float d=length(cv); float ang=atan(cv.y,cv.x);
+        float sp=sin(ang*6.+d*22.-time*3.5)*.5+.5;
+        float rp=sin(d*28.-time*4.)*.5+.5;
+        float edge=1.-smoothstep(.28,.5,d);
+        vec3 col=mix(c1,c2,rp)+vec3(sp*.15,sp*.25,sp*.5);
+        float alpha=edge*(.45+rp*.3+n(vUv*12.+time*.4)*.1);
+        gl_FragColor=vec4(col,alpha); }`
+  });
+  rift = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.2, 48, 48), mat);
+  rift.position.set(0, 1.4, -3.6); scene.add(rift);
+}
+
+function createStars(){
+  const geo = new THREE.BufferGeometry(), pos = [];
+  for (let i=0;i<600;i++){ const r=14+Math.random()*38, t=Math.random()*Math.PI*2, p=Math.acos(2*Math.random()-1);
+    pos.push(r*Math.sin(p)*Math.cos(t), r*Math.sin(p)*Math.sin(t), r*Math.cos(p)); }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  stars = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xffffff, size:0.06, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending }));
+  scene.add(stars);
+}
+
+// ─── HUD ───────────────────────────────────────────────────────────────────
+function buildHUD(){
+  hud = new THREE.Group(); hud.position.set(0, 2.25, -1.8); scene.add(hud);
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 200;
+  const tex = new THREE.CanvasTexture(c);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.273),
+    new THREE.MeshBasicMaterial({ map:tex, transparent:true }));
+  hud.add(mesh); hud.userData = { canvas:c, ctx:c.getContext('2d'), tex };
+}
+
+function rRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
+
+function updateHUD(){
+  const { canvas, ctx, tex } = hud.userData, W=1024, H=200;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='rgba(8,8,28,0.85)'; rRect(ctx,0,0,W,H,32); ctx.fill();
+  ctx.strokeStyle='rgba(120,200,255,0.7)'; ctx.lineWidth=4; rRect(ctx,0,0,W,H,32); ctx.stroke();
+  if (clapStart > 0){
+    const prog = Math.min(1, (Date.now()-clapStart)/CLAP_TIME);
+    const remain = Math.ceil((CLAP_TIME-(Date.now()-clapStart))/1000);
+    ctx.fillStyle='#ffffff'; ctx.font='bold 52px Georgia';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8; ctx.shadowOffsetY=2;
+    ctx.fillText(`Hold together for ${remain}s to exit`, W/2, 70);
+    ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+    ctx.fillStyle='rgba(120,200,255,0.18)'; rRect(ctx, 32, 138, W-64, 36, 18); ctx.fill();
+    if (prog > 0){
+      const grad = ctx.createLinearGradient(32, 0, W-32, 0);
+      grad.addColorStop(0, '#bae6fd'); grad.addColorStop(1, '#0ea5e9');
+      ctx.fillStyle = grad;
+      rRect(ctx, 32, 138, Math.round((W-64)*prog), 36, 18); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle='#ffdd88'; ctx.font='bold 64px Georgia'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(`★ ${state.score||0}`, 40, H/2);
+    const pairs = state.tiles ? Math.floor(state.tiles.length/2) : 0;
+    ctx.fillStyle='#88ddff'; ctx.textAlign='right';
+    ctx.fillText(`${pairs} pairs left`, W-40, H/2);
+    if (state.gameOver && state.tiles && !state.tiles.length){
+      ctx.fillStyle='#44ff88'; ctx.textAlign='center';
+      ctx.fillText('YOU WON! Pull trigger to restart', W/2, H/2);
+    }
+  }
+  tex.needsUpdate = true;
+}
+
+// ─── Audio ─────────────────────────────────────────────────────────────────
+function initAudio(){ try { audio = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} }
+function tone(freq, dur=0.15, type='sine', vol=0.10){
+  if (!audio) return;
+  if (audio.state === 'suspended') audio.resume();
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = type; o.frequency.value = freq;
+  o.connect(g); g.connect(audio.destination);
+  const t = audio.currentTime;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function chord(freqs, dur=0.32, type='triangle', vol=0.07){ freqs.forEach(f => tone(f, dur, type, vol)); }
+
+// ─── XR session ────────────────────────────────────────────────────────────
+async function startXR(){
+  if (!navigator.xr){ alert('WebXR not available'); return; }
+  try {
+    const ok = await navigator.xr.isSessionSupported('immersive-ar');
+    if (!ok){ document.getElementById('start-btn').textContent = 'AR N/A'; return; }
+    xrSession = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures:['local-floor'], optionalFeatures:['hand-tracking']
+    });
+    await renderer.xr.setSession(xrSession);
+    xrSession.addEventListener('end', onSessionEnd);
+    setupControllers();
+    document.getElementById('overlay').style.display = 'none';
+    renderer.setAnimationLoop(render);
+    startGame();
+  } catch(e){ console.error(e); }
+}
+
+function onSessionEnd(){
+  document.getElementById('overlay').style.display = 'flex';
+  renderer.setAnimationLoop(null);
+  xrSession = null; activeCtrl = null; controllers = []; clapStart = 0;
+}
+
+function exitXR(){ if (xrSession) xrSession.end(); }
+
+function setupControllers(){
+  controllers = [];
+  for (let i=0;i<2;i++){
+    const c = renderer.xr.getController(i);
+    c.addEventListener('selectstart', () => { setActive(c); handleTrigger(); });
+    scene.add(c); controllers.push(c);
+  }
+  const rg = new THREE.BufferGeometry();
+  rg.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0,0,0,-2], 3));
+  rayLine = new THREE.Line(rg, new THREE.LineBasicMaterial({ color:0x88ddff, transparent:true, opacity:0.85 }));
+  reticle = new THREE.Mesh(new THREE.RingGeometry(0.012, 0.022, 24),
+    new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0.95, side:THREE.DoubleSide, depthTest:false }));
+  reticle.renderOrder = 999;
+  scene.add(reticle); setActive(controllers[0]);
+}
+
+function setActive(c){ if (activeCtrl === c) return; if (activeCtrl) activeCtrl.remove(rayLine); activeCtrl = c; activeCtrl.add(rayLine); }
+
+// ─── Game state ────────────────────────────────────────────────────────────
+function startGame(){ 
+  state = { tiles:[], selected:[], score:0, gameOver:false, locked:false }; 
+  generateLayout(); 
+}
+
+function generateLayout(){
+  // Cleanup old geometries cleanly to avoid memory leaks on restart
+  if (state.tiles) {
+    state.tiles.forEach(t => {
+      scene.remove(t);
+      t.traverse(c => {
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) {
+          if (c.material.map) c.material.map.dispose();
+          c.material.dispose();
+        }
+      });
+    });
+  }
+  
+  state.tiles = []; state.selected = []; state.locked = false; state.gameOver = false; state.score = 0;
+  
+  // Create Pool of 144 perfectly paired tiles (36 types * 4 each)
+  const pool = [];
+  ALL_TYPES.forEach(t => pool.push(t, t, t, t));
+  pool.sort(() => Math.random() - 0.5);
+  
+  const cols = LAYOUT.map(p => p[0]), rows = LAYOUT.map(p => p[1]);
+  const cxC = (Math.min(...cols) + Math.max(...cols)) / 2;
+  const cyC = (Math.min(...rows) + Math.max(...rows)) / 2;
+  const stepX = (TW + 0.002) / 2, stepY = (TH + 0.002) / 2;
+
+  LAYOUT.forEach(([cx, cy, l], i) => {
+    const { sym, si } = pool[i];
+    const tile = createTile(sym, si);
+    // Aligning 3D coords. Invert Y so 0 is top row.
+    tile.position.set((cx - cxC) * stepX, -(cy - cyC) * stepY + 1.25, -2.2 + l * (TD + 0.002));
+    Object.assign(tile.userData, {
+      cx, cy, l, basePos: tile.position.clone(),
+      isSelected: false, isHovered: false, isMatched: false, flashTime: 0
+    });
+    scene.add(tile); state.tiles.push(tile);
+  });
+}
+
+// True 3D Mathematical overlap intersection based on standard Mahjong Rules
+function isFree(tile){
+  if (tile.userData.isMatched) return false;
+  const { cx, cy, l } = tile.userData;
+  const alive = state.tiles.filter(t => !t.userData.isMatched && t !== tile);
+
+  // 1. Is there anything on top of it? (Layer + 1, Overlapping in 2D space)
+  const topBlocked = alive.some(t => 
+    t.userData.l === l + 1 && 
+    Math.abs(t.userData.cx - cx) < 2 && 
+    Math.abs(t.userData.cy - cy) < 2
+  );
+  if (topBlocked) return false;
+
+  // 2. Is it pinned on both the left AND right?
+  const leftBlocked = alive.some(t => 
+    t.userData.l === l && 
+    t.userData.cx === cx - 2 && 
+    Math.abs(t.userData.cy - cy) < 2
+  );
+  const rightBlocked = alive.some(t => 
+    t.userData.l === l && 
+    t.userData.cx === cx + 2 && 
+    Math.abs(t.userData.cy - cy) < 2
+  );
+  
+  // It is free if it can be slid out to either the left or right
+  return !leftBlocked || !rightBlocked;
+}
+
+// ─── Tile mesh ─────────────────────────────────────────────────────────────
+function createTile(sym, si){
+  const group = new THREE.Group();
+  const suit = SUITS[si];
+  const bodyCol = new THREE.Color(suit.body).lerp(new THREE.Color(0xffffff), 0.6);
+  const baseEmissive = new THREE.Color(suit.body).multiplyScalar(0.12).getHex();
+  
+  const body = new THREE.Mesh(new THREE.BoxGeometry(TW, TH, TD),
+    new THREE.MeshLambertMaterial({ color:bodyCol, emissive:baseEmissive }));
+  group.add(body);
+
+  const cv = document.createElement('canvas'); cv.width = 160; cv.height = 210;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = suit.tint; ctx.fillRect(0, 0, 160, 210);
+  ctx.strokeStyle = suit.border; ctx.lineWidth = 10; ctx.strokeRect(6, 6, 148, 198);
+  const grad = ctx.createLinearGradient(0, 0, 0, 50);
+  grad.addColorStop(0, 'rgba(255,255,255,0.55)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad; ctx.fillRect(10, 10, 140, 50);
+  ctx.font = 'bold 120px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = suit.border; ctx.fillText(sym, 80, 118);
+  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 8;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(TW*0.94, TH*0.94),
+    new THREE.MeshBasicMaterial({ map:tex, transparent:true }));
+  face.position.z = TD/2 + 0.0015; group.add(face);
+  
+  group.userData = { body, baseColor:bodyCol.getHex(), baseEmissive, sym, si };
+  return group;
+}
+
+// ─── Trigger / selection ───────────────────────────────────────────────────
+function pickTile(){
+  if (!activeCtrl) return null;
+  const mx = new THREE.Matrix4().identity().extractRotation(activeCtrl.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(activeCtrl.matrixWorld);
+  raycaster.ray.direction.set(0,0,-1).applyMatrix4(mx).normalize();
+  const hits = raycaster.intersectObjects(state.tiles, true);
+  if (!hits.length) return null;
+  let t = hits[0].object;
+  while (t.parent && !('sym' in t.userData)) t = t.parent;
+  return ('sym' in t.userData && !t.userData.isMatched) ? { tile:t, hit:hits[0] } : null;
+}
+
+function handleTrigger(){
+  if (state.gameOver){ startGame(); return; }
+  if (state.locked) return;
+  const p = pickTile();
+  if (p) selectTile(p.tile);
+}
+
+function flashTile(tile){
+  tile.userData.flashTime = clock.getElapsedTime() + 0.35;
+}
+
+function selectTile(tile){
+  if (!isFree(tile)){ flashTile(tile); tone(220, 0.12, 'sawtooth', 0.08); return; }
+  if (state.selected.includes(tile)){
+    state.selected = state.selected.filter(t => t !== tile);
+    tile.userData.isSelected = false;
+    return;
+  }
+  if (state.selected.length >= 2) return;
+  state.selected.push(tile); tile.userData.isSelected = true;
+  tone(520, 0.10, 'sine', 0.10);
+  if (state.selected.length === 2){ state.locked = true; setTimeout(checkMatch, 350); }
+}
+
+function checkMatch(){
+  const [t1, t2] = state.selected; state.selected = [];
+  if (t1.userData.sym === t2.userData.sym){
+    state.score += 100;
+    chord([660, 880, 1320], 0.28, 'triangle', 0.07);
+    [t1, t2].forEach(t => {
+      t.userData.isMatched = true; t.userData.isSelected = false; t.userData.isHovered = false;
+      const y0 = t.position.y;
+      const a = setInterval(() => {
+        t.position.y += 0.028; t.rotation.y += 0.12; t.scale.multiplyScalar(0.93);
+        if (t.position.y > y0 + 0.65){ clearInterval(a); scene.remove(t); }
+      }, 16);
+    });
+    state.tiles = state.tiles.filter(t => !t.userData.isMatched);
+    if (!state.tiles.length) state.gameOver = true;
+  } else {
+    tone(180, 0.20, 'sawtooth', 0.10);
+    [t1, t2].forEach(t => { t.userData.isSelected = false; flashTile(t); });
+  }
+  state.locked = false;
+}
+
+// ─── Render loop ───────────────────────────────────────────────────────────
+function render(_, frame){
+  if (!frame) return;
+  const dt = clock.getDelta(), el = clock.getElapsedTime();
+  checkClap(controllers, exitXR);
+  
+  rift.material.uniforms.time.value = el;
+  stars.rotation.y += dt * 0.007;
+  
+  // Hover raycast
+  let curHover = null;
+  if (activeCtrl && !state.gameOver && !state.locked){
+    const p = pickTile();
+    if (p){
+      curHover = p.tile;
+      const free = isFree(curHover);
+      const pa = rayLine.geometry.attributes.position.array;
+      pa[5] = -p.hit.distance; rayLine.geometry.attributes.position.needsUpdate = true;
+      reticle.position.copy(p.hit.point);
+      const camPos = new THREE.Vector3(); camera.getWorldPosition(camPos);
+      reticle.lookAt(camPos);
+      reticle.material.color.setHex(free ? 0xffffff : 0xff3333);
+      reticle.visible = true;
+    } else {
+      const pa = rayLine.geometry.attributes.position.array;
+      pa[5] = -2; rayLine.geometry.attributes.position.needsUpdate = true;
+      reticle.visible = false;
+    }
+  } else if (reticle){ reticle.visible = false; }
+  
+  if (curHover !== hoveredTile){
+    if (hoveredTile) hoveredTile.userData.isHovered = false;
+    if (curHover) curHover.userData.isHovered = true;
+    hoveredTile = curHover;
+  }
+  
+  // Per-tile state animations
+  state.tiles.forEach(t => {
+    if (t.userData.isMatched) return;
+    const free = isFree(t);
+    
+    // Instead of jittery uniform scaling, lift it cleanly on the Z axis
+    const tz = t.userData.basePos.z + (t.userData.isSelected ? 0.05 : (t.userData.isHovered && free) ? 0.02 : 0);
+    t.position.z += (tz - t.position.z) * 0.22;
+    
+    if (t.userData.body){
+      const isFlashing = t.userData.flashTime && el < t.userData.flashTime;
+      
+      // Handle Emissive (Glow) Status
+      if (isFlashing) {
+         t.userData.body.material.emissive.setHex(0xff0000);
+      } else if (t.userData.isSelected) {
+         t.userData.body.material.emissive.setHex(0xffaa00);
+      } else if (t.userData.isHovered && free) {
+         t.userData.body.material.emissive.setHex(0x666677);
+      } else {
+         t.userData.body.material.emissive.setHex(t.userData.baseEmissive);
+      }
+      
+      // Dynamically darken unplayable/blocked tiles for better readability
+      const bodyCol = new THREE.Color(t.userData.baseColor);
+      const targetCol = free ? bodyCol : bodyCol.lerp(new THREE.Color(0x111122), 0.65);
+      t.userData.body.material.color.lerp(targetCol, 0.05);
+    }
+  });
+  
+  updateHUD();
+  renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
