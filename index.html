@@ -2,22 +2,22 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Celestial Mahjong – NXT/Care</title>
+<title>Mahjong – NXT/Care</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <style>
-*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#050510;font-family:Georgia,serif}
-#overlay{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2em;background:radial-gradient(ellipse at center,rgba(30,10,60,.92) 0%,rgba(5,5,16,.97) 100%);backdrop-filter:blur(18px)}
-#title{font-size:clamp(28px,7vw,72px);color:#88ddff;letter-spacing:.18em;text-transform:uppercase;text-shadow:0 0 40px rgba(100,180,255,.8),0 0 80px rgba(100,68,255,.4);margin:0;text-align:center}
-#start-btn{font-size:clamp(48px,11vw,110px);padding:.32em 1.1em;background:linear-gradient(135deg,#6644ff,#44aaff);color:#fff;border:none;border-radius:22px;cursor:pointer;font-weight:900;letter-spacing:.12em;text-transform:uppercase;box-shadow:0 0 80px rgba(100,68,255,.65),inset 0 1px 0 rgba(255,255,255,.2);font-family:Georgia,serif;transition:filter .2s,transform .2s}
-#start-btn:hover{filter:brightness(1.25);transform:scale(1.05)}
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Rounded","SF Pro Display","Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+#overlay{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% -20%,#e0f2fe 0%,#bae6fd 40%,#f8fafc 100%);background-size:150% 150%;animation:bg 15s ease-in-out infinite}
+@keyframes bg{0%,100%{background-position:50% 0%}50%{background-position:50% 100%}}
+#start-btn{font-size:clamp(48px,11vw,110px);padding:.32em 1em;background:rgba(255,255,255,.92);color:#0f172a;border:1px solid rgba(255,255,255,.9);border-radius:100px;cursor:pointer;font-weight:800;letter-spacing:-1px;box-shadow:0 12px 32px rgba(14,165,233,.22),inset 0 0 0 1px rgba(255,255,255,.6);font-family:inherit;transition:filter .25s,transform .25s;display:inline-flex;align-items:center;gap:.25em;backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px)}
+#start-btn:hover{filter:brightness(1.03);transform:scale(1.04);box-shadow:0 18px 44px rgba(14,165,233,.32),inset 0 0 0 1px rgba(255,255,255,.6)}
 </style>
 </head>
 <body>
-<div id="overlay"><p id="title">Celestial Mahjong</p><button id="start-btn">START</button></div>
+<div id="overlay"><button id="start-btn">🀄 Start</button></div>
 <script type="module">
 import * as THREE from 'three';
-
 // ─── Clap to Close (NXT/Care mandatory) ───────────────────────────
 let clapStart = 0;
 const CLAP_DIST = 0.15, CLAP_TIME = 6000;
@@ -30,14 +30,12 @@ function checkClap(ctrls, exitFn){
     else if (Date.now() - clapStart >= CLAP_TIME){ exitFn(); clapStart = 0; }
   } else clapStart = 0;
 }
-
 // ─── Controller Select – Single-Arm Mode (NXT/Care required) ──────
 const SELECT_TIME = 4000, HOLD_TIME = 3000;
 let isControllerSelection = false;
 let activeController = null;
 let ctrlHoldStart = {};
 let selectionStart = 0;
-
 function processControllerSelection(){
   if (!isControllerSelection || !controllers.length) return;
   const elapsed = (clock.getElapsedTime() - selectionStart) * 1000;
@@ -67,16 +65,15 @@ function confirmController(idx){
   setTimeout(() => tone(1320, 0.22, 'triangle', 0.10), 80);
   startGame();
 }
-
-// ─── Confetti burst (controller-select confirmation) ──────────────
+// ─── Confetti ─────────────────────────────────────────────────────
 let confetti = [];
+const CONFETTI_COLORS = [0xff44aa, 0x44aaff, 0xffdd44, 0x44ff88, 0xaa88ff, 0xff8844, 0xffffff, 0x66ddff];
 function triggerConfetti(ctrl){
-  const colors = [0xff44aa, 0x44aaff, 0xffdd44, 0x44ff88, 0xaa88ff, 0xff8844];
   const origin = new THREE.Vector3(); ctrl.getWorldPosition(origin);
   for (let i = 0; i < 60; i++){
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(0.018, 0.018),
-      new THREE.MeshBasicMaterial({ color: colors[i % colors.length], side: THREE.DoubleSide, transparent: true, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color: CONFETTI_COLORS[i % CONFETTI_COLORS.length], side: THREE.DoubleSide, transparent: true, depthWrite: false })
     );
     m.position.copy(origin);
     m.userData.vel = new THREE.Vector3((Math.random()-0.5)*1.6, Math.random()*1.8+0.8, (Math.random()-0.5)*1.6);
@@ -85,19 +82,31 @@ function triggerConfetti(ctrl){
     scene.add(m); confetti.push(m);
   }
 }
+function triggerWinConfetti(){
+  for (let i = 0; i < 220; i++){
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.024, 0.024),
+      new THREE.MeshBasicMaterial({ color: CONFETTI_COLORS[i % CONFETTI_COLORS.length], side: THREE.DoubleSide, transparent: true, depthWrite: false })
+    );
+    m.position.set((Math.random()-0.5)*2.6, 2.5+Math.random()*0.8, -2.0 + (Math.random()-0.5)*1.0);
+    m.userData.vel = new THREE.Vector3((Math.random()-0.5)*1.4, Math.random()*0.3-0.5, (Math.random()-0.5)*1.4);
+    m.userData.rot = new THREE.Vector3(Math.random()*8, Math.random()*8, Math.random()*8);
+    m.userData.life = 4.0;
+    scene.add(m); confetti.push(m);
+  }
+}
 function updateConfetti(dt){
   confetti = confetti.filter(p => {
     p.userData.life -= dt;
     if (p.userData.life <= 0){ scene.remove(p); p.geometry.dispose(); p.material.dispose(); return false; }
     p.position.addScaledVector(p.userData.vel, dt);
-    p.userData.vel.y -= 2.4 * dt;
+    p.userData.vel.y -= 1.6 * dt;
     p.rotation.x += p.userData.rot.x * dt;
     p.rotation.y += p.userData.rot.y * dt;
     p.material.opacity = Math.min(1, p.userData.life);
     return true;
   });
 }
-
 // ─── Tiles & Suits (36 types × 4 = 144 tiles) ─────────────────────
 const TW = 0.13, TH = 0.17, TD = 0.038;
 const SUITS = [
@@ -109,8 +118,6 @@ const SUITS = [
 ];
 const ALL_TYPES = [];
 SUITS.forEach((s, si) => s.syms.forEach(sym => ALL_TYPES.push({ sym, si })));
-
-// ─── Classic 144-tile turtle layout ───────────────────────────────
 const LAYOUT = [
   ...Array.from({length:12}, (_,i)=>[i*2+4, 0,0]),
   ...Array.from({length: 8}, (_,i)=>[i*2+8, 2,0]),
@@ -135,11 +142,6 @@ const LAYOUT = [
   ...Array.from({length:2}, (_,i)=>[i*2+14, 8,3]),
   [15,7,4]
 ];
-
-// ─── Solvable-layout generator ────────────────────────────────────
-// Reverse-construction: at every step pick TWO positions that are simultaneously
-// "free" (no tile above; left OR right side empty) in the remaining set.
-// Pairing consecutive picks with the same symbol guarantees ≥1 valid solution.
 function isFreeIn(p, set){
   const cx = p[0], cy = p[1], l = p[2];
   for (const q of set){
@@ -173,43 +175,36 @@ function generateRemovalOrder(){
   console.warn('Solvable layout: max attempts exceeded, using shuffled fallback');
   return LAYOUT.slice().sort(() => Math.random() - 0.5);
 }
-
-// ─── Globals ───────────────────────────────────────────────────────
+// ─── Globals ──────────────────────────────────────────────────────
 let scene, camera, renderer, raycaster, clock, xrSession;
 let controllers = [], rayLine, reticle, hoveredTile = null;
-let rift, stars, hud, audio;
+let rift, stars, hud, winPanel, audio;
 let state = { tiles: [], selected: [], score: 0, gameOver: false, locked: false };
-
+let winShownAt = 0;
 init();
-
 function init(){
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 100);
   raycaster = new THREE.Raycaster();
   clock = new THREE.Clock();
-
   renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(devicePixelRatio);
   renderer.xr.enabled = true;
   renderer.setClearColor(0x000000, 0);
   document.body.appendChild(renderer.domElement);
-
   // NXT/Care AR lighting baseline (ambient ≥ 1.5)
   scene.add(new THREE.AmbientLight(0xffffff, 1.6));
   const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(1,4,2); scene.add(dl);
   const dl2 = new THREE.DirectionalLight(0x88aaff, 0.5); dl2.position.set(-2,1,-1); scene.add(dl2);
-
-  createRift(); createStars(); buildHUD(); initAudio();
-
+  createRift(); createStars(); buildHUD(); buildWinPanel(); initAudio();
   document.getElementById('start-btn').addEventListener('click', startXR);
   addEventListener('resize', () => {
     camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
 }
-
-// ─── Backdrop ──────────────────────────────────────────────────────
+// ─── Backdrop ─────────────────────────────────────────────────────
 function createRift(){
   const mat = new THREE.ShaderMaterial({
     transparent:true, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false,
@@ -241,7 +236,6 @@ function createStars(){
   stars = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xffffff, size:0.06, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending }));
   scene.add(stars);
 }
-
 // ─── HUD (NXT/Care v1.3 white-glass) ──────────────────────────────
 function buildHUD(){
   hud = new THREE.Group();
@@ -290,7 +284,6 @@ function updateHUD(){
   drawWhiteGlass(ctx, W, H, R);
   ctx.fillStyle = '#0f172a';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-
   if (clapStart > 0){
     const prog = Math.min(1, (Date.now()-clapStart)/CLAP_TIME);
     const remain = Math.ceil((CLAP_TIME-(Date.now()-clapStart))/1000);
@@ -310,16 +303,68 @@ function updateHUD(){
     const pairs = state.tiles ? Math.floor(state.tiles.length/2) : 0;
     ctx.textAlign = 'right';
     ctx.fillText(`${pairs} par tilbage`, W-80, H/2);
-    if (state.gameOver && state.tiles && !state.tiles.length){
-      ctx.fillStyle = '#0369a1'; ctx.textAlign = 'center';
-      ctx.font = '800 48px -apple-system,"SF Pro Rounded","Segoe UI",Helvetica,sans-serif';
-      ctx.fillText('🎉 Du vandt! Tryk for at spille igen', W/2, H/2);
-    }
   }
   tex.needsUpdate = true;
 }
-
-// ─── Audio ─────────────────────────────────────────────────────────
+// ─── Win Panel — dedicated v1.3 white-glass celebration ───────────
+function buildWinPanel(){
+  winPanel = new THREE.Group();
+  winPanel.position.set(0, 1.45, -1.7);
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 640;
+  const tex = new THREE.CanvasTexture(c);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 0.94),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false })
+  );
+  mesh.renderOrder = 50;
+  winPanel.add(mesh);
+  winPanel.userData = { canvas: c, ctx: c.getContext('2d'), tex, mesh };
+  winPanel.visible = false;
+  scene.add(winPanel);
+}
+function drawWinPanel(){
+  if (!winPanel.visible) return;
+  const { canvas, ctx, tex } = winPanel.userData;
+  const W = 1024, H = 640, R = 90;
+  ctx.clearRect(0, 0, W, H);
+  // White-glass card with sky-blue elevation shadow (v1.3)
+  ctx.shadowColor = 'rgba(14,165,233,0.32)';
+  ctx.shadowBlur = 48; ctx.shadowOffsetY = 16;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  rRect(ctx, 28, 18, W-56, H-56, R); ctx.fill();
+  ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
+  rRect(ctx, 30, 20, W-60, H-60, R-2); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // Pulsing trophy emoji
+  const dt = clock.getElapsedTime() - winShownAt;
+  const scale = 1 + Math.sin(dt*3) * 0.08;
+  ctx.save();
+  ctx.translate(W/2, 200);
+  ctx.scale(scale, scale);
+  ctx.font = '220px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  ctx.fillText('🎉', 0, 0);
+  ctx.restore();
+  // Headline — accent-dark
+  ctx.fillStyle = '#0369a1';
+  ctx.font = '800 120px -apple-system,"SF Pro Rounded","Segoe UI",Helvetica,sans-serif';
+  ctx.fillText('Du vandt!', W/2, 400);
+  // Score chip
+  const scoreText = `★ ${state.score} point`;
+  ctx.font = '800 54px -apple-system,"SF Pro Rounded","Segoe UI",Helvetica,sans-serif';
+  const sw = ctx.measureText(scoreText).width + 80;
+  const sx = (W - sw) / 2, sy = 460, sh = 76;
+  ctx.fillStyle = 'rgba(14,165,233,0.12)';
+  rRect(ctx, sx, sy, sw, sh, sh/2); ctx.fill();
+  ctx.fillStyle = '#0369a1';
+  ctx.fillText(scoreText, W/2, sy + sh/2);
+  // Call-to-action — muted slate
+  ctx.fillStyle = '#475569';
+  ctx.font = '600 38px -apple-system,"SF Pro Rounded","Segoe UI",Helvetica,sans-serif';
+  ctx.fillText('Tryk for at spille igen', W/2, 580);
+  tex.needsUpdate = true;
+}
+// ─── Audio ────────────────────────────────────────────────────────
 function initAudio(){ try { audio = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} }
 function tone(freq, dur=0.15, type='sine', vol=0.10){
   if (!audio) return;
@@ -334,8 +379,27 @@ function tone(freq, dur=0.15, type='sine', vol=0.10){
   o.start(t); o.stop(t + dur + 0.05);
 }
 function chord(freqs, dur=0.32, type='triangle', vol=0.07){ freqs.forEach(f => tone(f, dur, type, vol)); }
-
-// ─── XR session ────────────────────────────────────────────────────
+// Smooth, satisfying hover sound — soft sine pluck + bell harmonic
+function hoverSound(){
+  if (!audio) return;
+  if (audio.state === 'suspended') audio.resume();
+  const t = audio.currentTime;
+  const o1 = audio.createOscillator(), g1 = audio.createGain();
+  o1.type = 'sine'; o1.frequency.value = 660;
+  o1.connect(g1); g1.connect(audio.destination);
+  g1.gain.setValueAtTime(0, t);
+  g1.gain.linearRampToValueAtTime(0.05, t + 0.008);
+  g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  o1.start(t); o1.stop(t + 0.22);
+  const o2 = audio.createOscillator(), g2 = audio.createGain();
+  o2.type = 'sine'; o2.frequency.value = 1320;
+  o2.connect(g2); g2.connect(audio.destination);
+  g2.gain.setValueAtTime(0, t);
+  g2.gain.linearRampToValueAtTime(0.025, t + 0.005);
+  g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  o2.start(t); o2.stop(t + 0.18);
+}
+// ─── XR session ───────────────────────────────────────────────────
 async function startXR(){
   if (!navigator.xr){ alert('WebXR not available'); return; }
   try {
@@ -349,7 +413,6 @@ async function startXR(){
     setupControllers();
     document.getElementById('overlay').style.display = 'none';
     renderer.setAnimationLoop(render);
-    // Begin Controller Select – game launches when patient raises free arm
     isControllerSelection = true;
     selectionStart = clock.getElapsedTime();
     ctrlHoldStart = {};
@@ -361,6 +424,7 @@ function onSessionEnd(){
   renderer.setAnimationLoop(null);
   xrSession = null; activeController = null; controllers = [];
   clapStart = 0; isControllerSelection = false;
+  if (winPanel) winPanel.visible = false;
 }
 function exitXR(){ if (xrSession) xrSession.end(); }
 function setupControllers(){
@@ -368,8 +432,8 @@ function setupControllers(){
   for (let i = 0; i < 2; i++){
     const c = renderer.xr.getController(i);
     c.addEventListener('selectstart', () => {
-      if (isControllerSelection) return;        // ignore triggers during select
-      if (c !== activeController) return;       // only the chosen arm acts
+      if (isControllerSelection) return;
+      if (c !== activeController) return;
       handleTrigger();
     });
     scene.add(c); controllers.push(c);
@@ -390,9 +454,11 @@ function setActive(c){
   activeController = c;
   if (c) c.add(rayLine);
 }
-
-// ─── Game ──────────────────────────────────────────────────────────
-function startGame(){ generateLayout(); }
+// ─── Game ─────────────────────────────────────────────────────────
+function startGame(){
+  if (winPanel) winPanel.visible = false;
+  generateLayout();
+}
 function generateLayout(){
   if (state.tiles){
     state.tiles.forEach(t => {
@@ -404,18 +470,14 @@ function generateLayout(){
     });
   }
   state = { tiles: [], selected: [], score: 0, gameOver: false, locked: false };
-
-  // SOLVABLE pairing: pair consecutive picks in a valid removal order
   const order = generateRemovalOrder();
   const typePool = [];
-  ALL_TYPES.forEach(t => typePool.push(t, t)); // 36 types × 2 pair-slots = 72 pairs
+  ALL_TYPES.forEach(t => typePool.push(t, t));
   typePool.sort(() => Math.random() - 0.5);
-
   const cols = LAYOUT.map(p => p[0]), rows = LAYOUT.map(p => p[1]);
   const cxC = (Math.min(...cols) + Math.max(...cols)) / 2;
   const cyC = (Math.min(...rows) + Math.max(...rows)) / 2;
   const stepX = (TW + 0.002) / 2, stepY = (TH + 0.002) / 2;
-
   for (let i = 0; i < order.length; i += 2){
     const type = typePool[i / 2];
     [order[i], order[i+1]].forEach(p => {
@@ -430,7 +492,6 @@ function generateLayout(){
     });
   }
 }
-
 function isFree(tile){
   if (tile.userData.isMatched) return false;
   const { cx, cy, l } = tile.userData;
@@ -440,7 +501,6 @@ function isFree(tile){
   const right = alive.some(t => t.userData.l === l && t.userData.cx === cx + 2 && Math.abs(t.userData.cy - cy) < 2);
   return !left || !right;
 }
-
 function createTile(sym, si){
   const group = new THREE.Group();
   const suit = SUITS[si];
@@ -470,7 +530,6 @@ function createTile(sym, si){
   group.userData = { body, baseColor: bodyCol.getHex(), baseEmissive, sym, si };
   return group;
 }
-
 function pickTile(){
   if (!activeController) return null;
   const mx = new THREE.Matrix4().identity().extractRotation(activeController.matrixWorld);
@@ -500,6 +559,22 @@ function selectTile(tile){
   tone(520, 0.10, 'sine', 0.10);
   if (state.selected.length === 2){ state.locked = true; setTimeout(checkMatch, 350); }
 }
+function celebrateWin(){
+  state.gameOver = true;
+  winShownAt = clock.getElapsedTime();
+  winPanel.visible = true;
+  triggerWinConfetti();
+  // Triumphant fanfare — rising major arpeggios
+  chord([523, 659, 784, 1047], 0.55, 'triangle', 0.09);
+  setTimeout(() => chord([659, 784, 988, 1319], 0.55, 'triangle', 0.09), 220);
+  setTimeout(() => chord([784, 988, 1175, 1568], 0.75, 'triangle', 0.09), 460);
+  // Sustained sparkle drizzle
+  let n = 0;
+  const drizzle = setInterval(() => {
+    if (!state.gameOver || ++n > 6){ clearInterval(drizzle); return; }
+    triggerWinConfetti();
+  }, 700);
+}
 function checkMatch(){
   const [t1, t2] = state.selected; state.selected = [];
   if (t1.userData.sym === t2.userData.sym){
@@ -514,26 +589,22 @@ function checkMatch(){
       }, 16);
     });
     state.tiles = state.tiles.filter(t => !t.userData.isMatched);
-    if (!state.tiles.length){ state.gameOver = true; chord([880, 1100, 1320, 1760], 0.5, 'triangle', 0.08); }
+    if (!state.tiles.length) celebrateWin();
   } else {
     tone(180, 0.20, 'sawtooth', 0.10);
     [t1, t2].forEach(t => { t.userData.isSelected = false; flashTile(t); });
   }
   state.locked = false;
 }
-
-// ─── Render loop ───────────────────────────────────────────────────
+// ─── Render loop ──────────────────────────────────────────────────
 function render(_, frame){
   if (!frame) return;
   const dt = clock.getDelta(), el = clock.getElapsedTime();
-
-  checkClap(controllers, exitXR);     // NXT/Care mandatory exit
-  processControllerSelection();        // NXT/Care single-arm select
+  checkClap(controllers, exitXR);
+  processControllerSelection();
   updateConfetti(dt);
-
   rift.material.uniforms.time.value = el;
   stars.rotation.y += dt * 0.007;
-
   let curHover = null;
   if (activeController && !isControllerSelection && !state.gameOver && !state.locked){
     const p = pickTile();
@@ -553,13 +624,12 @@ function render(_, frame){
       reticle.visible = false;
     }
   } else if (reticle){ reticle.visible = false; }
-
+  // Hover transition — play satisfying pluck on new hover
   if (curHover !== hoveredTile){
     if (hoveredTile) hoveredTile.userData.isHovered = false;
-    if (curHover) curHover.userData.isHovered = true;
+    if (curHover){ curHover.userData.isHovered = true; hoverSound(); }
     hoveredTile = curHover;
   }
-
   state.tiles.forEach(t => {
     if (t.userData.isMatched) return;
     const free = isFree(t);
@@ -576,8 +646,13 @@ function render(_, frame){
       t.userData.body.material.color.lerp(targetCol, 0.05);
     }
   });
-
   updateHUD();
+  drawWinPanel();
+  if (winPanel.visible){
+    // Always face the patient
+    const camPos = new THREE.Vector3(); camera.getWorldPosition(camPos);
+    winPanel.lookAt(camPos);
+  }
   renderer.render(scene, camera);
 }
 </script>
