@@ -3,19 +3,112 @@
 <head>
 <meta charset="utf-8">
 <title>Mahjong – NXT/Care</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <style>
-*{box-sizing:border-box}
-body{margin:0;overflow:hidden;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Rounded","SF Pro Display","Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-#overlay{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% -20%,#e0f2fe 0%,#bae6fd 40%,#f8fafc 100%);background-size:150% 150%;animation:bg 15s ease-in-out infinite}
-@keyframes bg{0%,100%{background-position:50% 0%}50%{background-position:50% 100%}}
-#start-btn{font-size:clamp(48px,11vw,110px);padding:.32em 1em;background:rgba(255,255,255,.92);color:#0f172a;border:1px solid rgba(255,255,255,.9);border-radius:100px;cursor:pointer;font-weight:800;letter-spacing:-1px;box-shadow:0 12px 32px rgba(14,165,233,.22),inset 0 0 0 1px rgba(255,255,255,.6);font-family:inherit;transition:filter .25s,transform .25s;display:inline-flex;align-items:center;gap:.25em;backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px)}
-#start-btn:hover{filter:brightness(1.03);transform:scale(1.04);box-shadow:0 18px 44px rgba(14,165,233,.32),inset 0 0 0 1px rgba(255,255,255,.6)}
+  :root {
+    /* NXT/Care Colors */
+    --sky-100: #e0f2fe;
+    /* Variant 21 Color: The selected soft purple/blue */
+    --sky-500: #8bb1e9; 
+    
+    /* Physics */
+    --spring: 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.25);
+    
+    /* MASSIVE Target Sizes */
+    --btn-size: clamp(220px, 35vw, 450px);
+    /* Variant 21 Icon Scale: 1.6x the original size */
+    --icon-size: clamp(128px, 19.2vw, 256px); 
+  }
+
+  * { 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent; 
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--sky-100);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sky-100);
+  }
+
+  /* Universal Play Icon SVG Styles */
+  .play-svg {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    fill: currentColor;
+    margin-left: 10%; /* Optical centering for the play triangle */
+    transition: all var(--spring);
+  }
+
+  /* ==========================================================================
+     THE "LIQUID SKY PUDDLE" BUTTON
+     ========================================================================== */
+  .xr-btn {
+    position: relative;
+    cursor: pointer; 
+    outline: none; 
+    border: none;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    text-decoration: none; 
+    user-select: none;
+    transition: all var(--spring);
+    
+    /* Specific Shape & Colors */
+    width: calc(var(--btn-size) * 1.2); 
+    height: calc(var(--btn-size) * 1.1);
+    border-radius: 60% 40% 40% 60% / 50% 60% 40% 50%;
+    background: var(--sky-100); 
+    color: var(--sky-500);
+    box-shadow: inset 15px 15px 30px #b9ddf5, inset -15px -15px 30px #ffffff;
+  }
+  
+  .xr-btn:hover { 
+    border-radius: 50%; 
+    transform: scale(1.05); 
+    background: var(--sky-500); 
+    color: var(--sky-100); 
+    box-shadow: 15px 15px 30px #b9ddf5, -15px -15px 30px #ffffff; 
+  }
+
+  .xr-btn:active {
+    transform: scale(0.95);
+  }
 </style>
 </head>
 <body>
-<div id="overlay"><button id="start-btn">🀄 Start</button></div>
+
+<div id="overlay">
+  <!-- SVG Defs -->
+  <svg width="0" height="0" style="position:absolute;">
+    <defs>
+      <g id="icon-play">
+        <path d="M8 5v14l11-7z" stroke-linejoin="round" stroke-linecap="round"/>
+      </g>
+    </defs>
+  </svg>
+
+  <!-- Launch Button -->
+  <button class="xr-btn" id="start-btn" aria-label="Start XR Experience">
+    <svg class="play-svg" viewBox="0 0 24 24">
+      <use href="#icon-play"></use>
+    </svg>
+  </button>
+</div>
+
 <script type="module">
 import * as THREE from 'three';
 // ─── Clap to Close (NXT/Care mandatory) ───────────────────────────
